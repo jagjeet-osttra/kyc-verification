@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_1l6xa2w" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.36.1" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.23.0">
+  <bpmn:process id="Kyc-workflow" name="Simplified KYC Workflow" isExecutable="true" camunda:historyTimeToLive="P30D">
+    <bpmn:startEvent id="Kyc-verification-workflow" name="KYC Process Initiated">
+      <bpmn:outgoing>Flow_To_MergeGateway</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:exclusiveGateway id="Gateway_Merge_Loop" name="First time submission or Data Correction">
+      <bpmn:incoming>Flow_To_MergeGateway</bpmn:incoming>
+      <bpmn:incoming>Flow_Loop_Back_To_Submit</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_SubmitData</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0hfy8kc</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_To_MergeGateway" sourceRef="Kyc-verification-workflow" targetRef="Gateway_Merge_Loop" />
+    <bpmn:userTask id="SubmitKycData" name="Submit KYC Data">
+      <bpmn:extensionElements />
+      <bpmn:incoming>Flow_To_SubmitData</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_ValidateData</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_To_SubmitData" name="First time Submission" sourceRef="Gateway_Merge_Loop" targetRef="SubmitKycData">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${firstTimeSubmission == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:serviceTask id="Task_ValidateData" name="Validate Data (Automated)" camunda:class="com.osttra.alpine.camundaEvents.KycDataValidation">
+      <bpmn:incoming>Flow_1j91bba</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_ValidationGateway</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_To_ValidateData" sourceRef="SubmitKycData" targetRef="Gateway_1u4dg9f" />
+    <bpmn:exclusiveGateway id="Gateway_ValidationResult" name="Validation Passed?">
+      <bpmn:incoming>Flow_To_ValidationGateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_ValidationPassed</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ValidationFailed</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_To_ValidationGateway" sourceRef="Task_ValidateData" targetRef="Gateway_ValidationResult" />
+    <bpmn:userTask id="ReviewKycData" name="Review and Approve KYC Data">
+      <bpmn:incoming>Flow_ValidationPassed</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_ApprovalGateway</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_ValidationPassed" name="Yes" sourceRef="Gateway_ValidationResult" targetRef="ReviewKycData">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${validationSuccess == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:exclusiveGateway id="Gateway_ApprovalResult" name="Approved?">
+      <bpmn:incoming>Flow_To_ApprovalGateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_Approved</bpmn:outgoing>
+      <bpmn:outgoing>Flow_NotApproved</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_To_ApprovalGateway" sourceRef="ReviewKycData" targetRef="Gateway_ApprovalResult" />
+    <bpmn:serviceTask id="Task_NotifyCompletion" name="Notify User of Approval" camunda:class="com.osttra.alpine.camundaEvents.KycApprovalNotification">
+      <bpmn:incoming>Flow_Approved</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_EndCompleted</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_Approved" name="Yes" sourceRef="Gateway_ApprovalResult" targetRef="Task_NotifyCompletion">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${approved == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:endEvent id="EndEvent_Completed" name="KYC Completed">
+      <bpmn:incoming>Flow_To_EndCompleted</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_To_EndCompleted" sourceRef="Task_NotifyCompletion" targetRef="EndEvent_Completed" />
+    <bpmn:serviceTask id="Task_NotifyToResubmit" name="Notify User of Rejection" camunda:class="com.osttra.alpine.camundaEvents.KycRejectionNotification">
+      <bpmn:incoming>Flow_ValidationFailed</bpmn:incoming>
+      <bpmn:incoming>Flow_NotApproved</bpmn:incoming>
+      <bpmn:outgoing>Flow_Loop_Back_To_Submit</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_ValidationFailed" name="No" sourceRef="Gateway_ValidationResult" targetRef="Task_NotifyToResubmit">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${validationSuccess == false}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_NotApproved" name="No" sourceRef="Gateway_ApprovalResult" targetRef="Task_NotifyToResubmit">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${approved == false}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Loop_Back_To_Submit" sourceRef="Task_NotifyToResubmit" targetRef="Gateway_Merge_Loop" />
+    <bpmn:exclusiveGateway id="Gateway_1u4dg9f">
+      <bpmn:incoming>Flow_To_ValidateData</bpmn:incoming>
+      <bpmn:incoming>Flow_00b458c</bpmn:incoming>
+      <bpmn:outgoing>Flow_1j91bba</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_1j91bba" sourceRef="Gateway_1u4dg9f" targetRef="Task_ValidateData" />
+    <bpmn:sequenceFlow id="Flow_0hfy8kc" name="Data Correction" sourceRef="Gateway_Merge_Loop" targetRef="ResubmitKycData">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${firstTimeSubmission == false}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:userTask id="ResubmitKycData" name="Resubmit data">
+      <bpmn:incoming>Flow_0hfy8kc</bpmn:incoming>
+      <bpmn:outgoing>Flow_00b458c</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_00b458c" sourceRef="ResubmitKycData" targetRef="Gateway_1u4dg9f" />
+    <bpmn:boundaryEvent id="Event_0272dly" name="Every 2 days" cancelActivity="false" attachedToRef="ResubmitKycData">
+      <bpmn:outgoing>Flow_0wy1nr7</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerEventDefinition_0w8jqjc">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P2D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="Flow_0wy1nr7" sourceRef="Event_0272dly" targetRef="Activity_04mq656" />
+    <bpmn:serviceTask id="Activity_04mq656" name="Notify User to resubmit data" camunda:class="com.osttra.alpine.camundaEvents.ResubmissionDataNotification">
+      <bpmn:incoming>Flow_0wy1nr7</bpmn:incoming>
+      <bpmn:outgoing>Flow_0wvp0wl</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="Event_1pd099z">
+      <bpmn:incoming>Flow_0wvp0wl</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_0wvp0wl" sourceRef="Activity_04mq656" targetRef="Event_1pd099z" />
+    <bpmn:boundaryEvent id="Event_17wefl1" name="Every 2 days" cancelActivity="false" attachedToRef="ReviewKycData">
+      <bpmn:outgoing>Flow_05nv3rk</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerEventDefinition_0tup955">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P2D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="Activity_1dr94bs" name="Notify to review and submit data" camunda:class="com.osttra.alpine.camundaEvents.DataReviewNotification">
+      <bpmn:incoming>Flow_05nv3rk</bpmn:incoming>
+      <bpmn:outgoing>Flow_0ki6pc5</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_05nv3rk" sourceRef="Event_17wefl1" targetRef="Activity_1dr94bs" />
+    <bpmn:endEvent id="Event_0uobz59">
+      <bpmn:incoming>Flow_0ki6pc5</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_0ki6pc5" sourceRef="Activity_1dr94bs" targetRef="Event_0uobz59" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Kyc-workflow">
+      <bpmndi:BPMNShape id="Event_1h4y68p_di" bpmnElement="EndEvent_Completed">
+        <dc:Bounds x="1382" y="362" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1361" y="405" width="79" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0h075l4_di" bpmnElement="Task_NotifyToResubmit">
+        <dc:Bounds x="940" y="510" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0aw0wdh_di" bpmnElement="Activity_04mq656">
+        <dc:Bounds x="580" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_1pd099z_di" bpmnElement="Event_1pd099z">
+        <dc:Bounds x="732" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_002g2wc_di" bpmnElement="ResubmitKycData">
+        <dc:Bounds x="460" y="210" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="Kyc-verification-workflow">
+        <dc:Bounds x="172" y="362" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="158" y="405" width="66" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_1q3i4u3_di" bpmnElement="Gateway_Merge_Loop" isMarkerVisible="true">
+        <dc:Bounds x="265" y="355" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="291" y="399" width="78" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1yh147o_di" bpmnElement="SubmitKycData">
+        <dc:Bounds x="440" y="340" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0bu2612_di" bpmnElement="Task_ValidateData">
+        <dc:Bounds x="690" y="340" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_1u4dg9f_di" bpmnElement="Gateway_1u4dg9f" isMarkerVisible="true">
+        <dc:Bounds x="595" y="355" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_0ueqbk9_di" bpmnElement="Gateway_ValidationResult" isMarkerVisible="true">
+        <dc:Bounds x="835" y="355" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="837" y="325" width="47" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_0ks34c1_di" bpmnElement="Gateway_ApprovalResult" isMarkerVisible="true">
+        <dc:Bounds x="1105" y="355" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1098" y="325" width="53" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1dr94bs_di" bpmnElement="Activity_1dr94bs">
+        <dc:Bounds x="1080" y="200" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0uobz59_di" bpmnElement="Event_0uobz59">
+        <dc:Bounds x="1242" y="222" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0ux96e1_di" bpmnElement="ReviewKycData">
+        <dc:Bounds x="960" y="340" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_15m2nlc_di" bpmnElement="Task_NotifyCompletion">
+        <dc:Bounds x="1230" y="340" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0272dly_di" bpmnElement="Event_0272dly">
+        <dc:Bounds x="492" y="192" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="517" y="173" width="65" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_17wefl1_di" bpmnElement="Event_17wefl1">
+        <dc:Bounds x="992" y="322" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1017" y="303" width="65" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_0b1e3qk_di" bpmnElement="Flow_To_EndCompleted">
+        <di:waypoint x="1330" y="380" />
+        <di:waypoint x="1382" y="380" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_02p85q6_di" bpmnElement="Flow_ValidationFailed">
+        <di:waypoint x="860" y="405" />
+        <di:waypoint x="860" y="550" />
+        <di:waypoint x="940" y="550" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="868" y="475" width="15" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0019qcr_di" bpmnElement="Flow_NotApproved">
+        <di:waypoint x="1130" y="405" />
+        <di:waypoint x="1130" y="550" />
+        <di:waypoint x="1040" y="550" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1138" y="474" width="15" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1x2k7o1_di" bpmnElement="Flow_Loop_Back_To_Submit">
+        <di:waypoint x="940" y="570" />
+        <di:waypoint x="290" y="570" />
+        <di:waypoint x="290" y="405" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0wy1nr7_di" bpmnElement="Flow_0wy1nr7">
+        <di:waypoint x="510" y="192" />
+        <di:waypoint x="510" y="120" />
+        <di:waypoint x="580" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0wvp0wl_di" bpmnElement="Flow_0wvp0wl">
+        <di:waypoint x="680" y="120" />
+        <di:waypoint x="732" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0hfy8kc_di" bpmnElement="Flow_0hfy8kc">
+        <di:waypoint x="290" y="355" />
+        <di:waypoint x="290" y="250" />
+        <di:waypoint x="460" y="250" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="291" y="303" width="78" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_00b458c_di" bpmnElement="Flow_00b458c">
+        <di:waypoint x="560" y="250" />
+        <di:waypoint x="620" y="250" />
+        <di:waypoint x="620" y="355" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_08w8k57_di" bpmnElement="Flow_To_MergeGateway">
+        <di:waypoint x="208" y="380" />
+        <di:waypoint x="265" y="380" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_02uvk2c_di" bpmnElement="Flow_To_SubmitData">
+        <di:waypoint x="315" y="380" />
+        <di:waypoint x="440" y="380" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="349" y="346" width="57" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1fsk4b8_di" bpmnElement="Flow_To_ValidateData">
+        <di:waypoint x="540" y="380" />
+        <di:waypoint x="595" y="380" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1j91bba_di" bpmnElement="Flow_1j91bba">
+        <di:waypoint x="645" y="380" />
+        <di:waypoint x="690" y="380" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1p74n06_di" bpmnElement="Flow_To_ValidationGateway">
+        <di:waypoint x="790" y="380" />
+        <di:waypoint x="835" y="380" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1647qqn_di" bpmnElement="Flow_ValidationPassed">
+        <di:waypoint x="885" y="380" />
+        <di:waypoint x="960" y="380" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="916" y="362" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0j2t7b1_di" bpmnElement="Flow_To_ApprovalGateway">
+        <di:waypoint x="1060" y="380" />
+        <di:waypoint x="1105" y="380" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1u8h69t_di" bpmnElement="Flow_Approved">
+        <di:waypoint x="1155" y="380" />
+        <di:waypoint x="1230" y="380" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1184" y="362" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_05nv3rk_di" bpmnElement="Flow_05nv3rk">
+        <di:waypoint x="1010" y="322" />
+        <di:waypoint x="1010" y="240" />
+        <di:waypoint x="1080" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0ki6pc5_di" bpmnElement="Flow_0ki6pc5">
+        <di:waypoint x="1180" y="240" />
+        <di:waypoint x="1242" y="240" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
