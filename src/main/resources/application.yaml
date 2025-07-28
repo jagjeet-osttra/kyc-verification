@@ -15,3 +15,5 @@ camunda:
     admin-user:
       id: demo
       password: demo
+  process:
+    name: "Kyc-workflow"

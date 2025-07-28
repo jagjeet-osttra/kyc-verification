@@ -19,16 +19,16 @@ public class KycDataServiceImpl implements KycDataService {
     private final KycDataRepository kycDataRepository;
     private final KycApproverDetailsRepository kycApproverDetailsRepository;
     @Override
-    public void submitKycData(TaskCompletionRequestDto taskCompletionRequestDto) {
-        KycData kycData = kycDataRepository
-                .findByProcessId(taskCompletionRequestDto.getProcessId()).orElse(null);
-        if(kycData==null)
-            kycData = KycData.builder().processId(taskCompletionRequestDto.getProcessId())
-                .data(taskCompletionRequestDto.getFormData()).build();
-        else
-            kycData.setData(taskCompletionRequestDto.getFormData());
-        kycDataRepository.save(kycData);
-    }
+        public void submitKycData(TaskCompletionRequestDto taskCompletionRequestDto) {
+            KycData kycData = kycDataRepository
+                    .findByProcessId(taskCompletionRequestDto.getProcessId()).orElse(null);
+            if(kycData==null)
+                kycData = KycData.builder().processId(taskCompletionRequestDto.getProcessId())
+                    .data(taskCompletionRequestDto.getFormData()).build();
+            else
+                kycData.setData(taskCompletionRequestDto.getFormData());
+            kycDataRepository.save(kycData);
+        }
 
     @Override
     public void reviewKycData(TaskCompletionRequestDto taskCompletionRequestDto) {

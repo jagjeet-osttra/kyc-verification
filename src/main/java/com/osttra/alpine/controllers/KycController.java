@@ -9,6 +9,7 @@ import org.camunda.bpm.engine.RuntimeService;
 import org.camunda.bpm.engine.TaskService;
 import org.camunda.bpm.engine.runtime.ProcessInstance;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
@@ -16,7 +17,6 @@ import org.springframework.web.client.RestTemplate;
 import java.util.Map;
 
 @RestController
-@AllArgsConstructor
 @RequestMapping("/api/kyc")
 @CrossOrigin(origins = "*")
 public class KycController {
@@ -26,22 +26,24 @@ public class KycController {
 
     private final TaskService taskService;
 
+    @Value("${camunda.process.name}")
+    private String PROCESS_NAME;
+
     @Autowired
     RestTemplate restTemplate;
 
     private final KycHandlerService kycHandlerService;
 
-    @GetMapping("/test")
-    public ResponseEntity<String> testController()
-    {
-        throw new RuntimeException("Hey! Got the stuck!");
+    public KycController(TaskService taskService, KycHandlerService kycHandlerService) {
+        this.taskService = taskService;
+        this.kycHandlerService = kycHandlerService;
     }
 
     @PostMapping("/start")
     public ResponseEntity<String> startKyc()
     {
         Map<String,Object> variables = Map.of("firstTimeSubmission",true);
-        ProcessInstance instance = runtimeService.startProcessInstanceByKey("Kyc-workflow",variables);
+        ProcessInstance instance = runtimeService.startProcessInstanceByKey(PROCESS_NAME,variables);
         return ResponseEntity.ok(instance.getId());
     }
 
